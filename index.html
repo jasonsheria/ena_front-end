@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot Flottant ENA (Amélioré avec Cookies & Backend pour tous)</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <style>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Chatbot Flottant ENA (Amélioré avec Cookies & Backend pour
+            tous)</title>
+        <script src="https://accounts.google.com/gsi/client" async
+            defer></script>
+        <link rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+            integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
+            crossorigin="anonymous" referrerpolicy="no-referrer" />
+        <style>
         /* Styles généraux */
         :root {
             --primary-color: #090D81;
@@ -440,47 +445,60 @@
                 max-width: 95%; /* Limite max */
             }
         }
+        .message-time {
+            display: block;
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+            text-align: right;
+        }
     </style>
-</head>
-<body>
-    <div id="chatbot-toggle">
-        <i class="fas fa-comments"></i> </div>
+    </head>
+    <body>
+        <div id="chatbot-toggle">
+            <i class="fas fa-comments"></i> </div>
 
-    <div id="chatbot-container">
-        <div id="chatbot-header">
-            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSpNxRRrQwVtcrotX_XcymUxR2b7oaFYcS6XKjJPG4FVeWlo5BGNsBcEA8NzHJdW3WeWvI&usqp=CAU" alt="Logo ENA">
-            <span>ENA-RDC</span>
+        <div id="chatbot-container">
+            <div id="chatbot-header">
+                <img
+                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSpNxRRrQwVtcrotX_XcymUxR2b7oaFYcS6XKjJPG4FVeWlo5BGNsBcEA8NzHJdW3WeWvI&usqp=CAU"
+                    alt="Logo ENA">
+                <span>ENA-RDC</span>
             </div>
 
-        <div id="google-sign-in-container">
-            <div id="google-sign-in"></div>
+            <div id="google-sign-in-container">
+                <div id="google-sign-in"></div>
+            </div>
+
+            <div id="chatbot-output">
+            </div>
+
+            <div id="chatbot-input-area">
+                <button id="file-button" class="input-button"
+                    title="Joindre un fichier">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="file" id="file-input"
+                    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt">
+
+                <button id="emoji-button" class="input-button"
+                    title="Insérer un emoji">
+                    <i class="far fa-smile"></i>
+                </button>
+
+                <input type="text" id="chatbot-input"
+                    placeholder="Posez votre question...">
+
+                <button id="chatbot-send" title="Envoyer le message">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+
+            <div id="emoji-picker">
+            </div>
         </div>
 
-        <div id="chatbot-output">
-            </div>
-
-        <div id="chatbot-input-area">
-            <button id="file-button" class="input-button" title="Joindre un fichier">
-                <i class="fas fa-paperclip"></i>
-            </button>
-            <input type="file" id="file-input" accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt">
-
-            <button id="emoji-button" class="input-button" title="Insérer un emoji">
-                <i class="far fa-smile"></i>
-            </button>
-
-            <input type="text" id="chatbot-input" placeholder="Posez votre question...">
-
-            <button id="chatbot-send" title="Envoyer le message">
-                <i class="fas fa-paper-plane"></i>
-            </button>
-        </div>
-
-        <div id="emoji-picker">
-            </div>
-    </div>
-
-    <script>
+        <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- Sélection des éléments du DOM ---
             const chatbotToggle = document.getElementById('chatbot-toggle');
@@ -570,11 +588,17 @@
                 chatOutput.appendChild(userDiv);
                 scrollToBottom();
             }
-
+// Fonction pour formater l'heure
+function formatTime(date) {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
             // Afficher un message bot dans le chat
             function displayBotMessage(message) {
                 const botDiv = document.createElement('div');
                 botDiv.classList.add('bot-message', 'message-bubble');
+                const time = formatTime(new Date());
                 // Détection simple de liens (plus sûr que replace global)
                  const urlRegex = /(https?:\/\/[^\s]+)/g;
                  let lastIndex = 0;
@@ -603,7 +627,49 @@
                  if (lastIndex < message.length) {
                      botDiv.appendChild(document.createTextNode(message.substring(lastIndex)));
                  }
+// Afficher un message utilisateur dans le chat
+function displayUserMessage(message) {
+    const userDiv = document.createElement('div');
+    userDiv.classList.add('user-message', 'message-bubble');
 
+    const time = formatTime(new Date());
+    userDiv.innerHTML = `<span>${message}</span><span class="message-time">${time}</span>`;  // Ajout de l'heure
+
+    chatOutput.appendChild(userDiv);
+    scrollToBottom();
+}
+
+// Afficher un message bot dans le chat
+function displayBotMessage(message) {
+    const botDiv = document.createElement('div');
+    botDiv.classList.add('bot-message', 'message-bubble');
+
+    const time = formatTime(new Date());
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = urlRegex.exec(message)) !== null) {
+        if (match.index > lastIndex) {
+            botDiv.appendChild(document.createTextNode(message.substring(lastIndex, match.index)));
+        }
+        const link = document.createElement('a');
+        link.href = match[0];
+        link.textContent = match[0];
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        botDiv.appendChild(link);
+        lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < message.length) {
+        botDiv.appendChild(document.createTextNode(message.substring(lastIndex)));
+    }
+
+    botDiv.innerHTML += `<span class="message-time">${time}</span>`; // Ajout de l'heure
+    chatOutput.appendChild(botDiv);
+    scrollToBottom();
+}
                 chatOutput.appendChild(botDiv);
                 scrollToBottom();
             }
@@ -1197,6 +1263,6 @@
 
         });
     </script>
-`
-</body>
+        `
+    </body>
 </html>
