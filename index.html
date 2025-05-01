@@ -7,7 +7,7 @@
             tous)</title>
         <script src="https://accounts.google.com/gsi/client" async
             defer></script>
-        <audio id="message-sound" src="notification.mp3" preload="auto"></audio>
+       
         <link rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
             integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
@@ -39,7 +39,13 @@
             min-height: 150vh;
             background-color: #f4f4f4;
         }
-
+        .chatbot-output .waiting-message {
+            font-style: italic;
+            color: #888; /* Couleur grise pour le distinguer */
+            /* Vous pouvez ajouter une petite animation si vous voulez */
+            /* opacity: 0.8; */
+            /* animation: pulse 1.5s infinite ease-in-out; */
+        }
         /* Bouton flottant pour ouvrir/fermer */
         #chatbot-toggle {
             position: fixed;
@@ -483,7 +489,7 @@
         }
     </style>
     </head>
-    <body>
+    <body> <audio id="message-sound" src="Whatsapp-Message.mp3" preload="auto"></audio>
         
         <div id="chatbot-toggle">
             <i class="fas fa-comments"></i> </div>
@@ -575,9 +581,9 @@
             
                         // --- Configuration ---
                         const GOOGLE_CLIENT_ID = '900358554333-g3k99qk3da90po7cc3ajm5cv8oq2dkda.apps.googleusercontent.com';
-                        const AUTH_BACKEND_URL = 'http://enabotserveur.onrender.com/api/auth/google';
-                        const CHAT_BACKEND_URL = 'http://enabotserveur.onrender.com/api/chat';
-                        const FILE_UPLOAD_BACKEND_URL = 'http://enabotserveur.onrender.com/api/upload';
+                        const AUTH_BACKEND_URL = 'https://enabotserveur.onrender.com/api/auth/google';
+                        const CHAT_BACKEND_URL = 'https://enabotserveur.onrender.com/api/chat';
+                        const FILE_UPLOAD_BACKEND_URL = 'https://enabotserveur.onrender.com/api/upload';
             
                         // Liste d'emojis (gardée pour fonctionnalité)
                         const EMOJI_LIST = [
