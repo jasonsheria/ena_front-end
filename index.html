@@ -7,6 +7,7 @@
             tous)</title>
         <script src="https://accounts.google.com/gsi/client" async
             defer></script>
+        <audio id="message-sound" src="notification.mp3" preload="auto"></audio>
         <link rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
             integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
@@ -65,7 +66,22 @@
             transform: scale(1.1);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
         }
-
+        .status {
+            margin-left: auto;
+            font-size: 0.9rem;
+            padding: 5px 10px;
+            border-radius: 12px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .status.online {
+            background-color: #28a745; /* Vert pour en ligne */
+        }
+        
+        .status.offline {
+            background-color: #dc3545; /* Rouge pour hors ligne */
+        }
         /* Keyframes pour pulse */
         @keyframes pulse {
             from { transform: scale(1); }
@@ -279,7 +295,20 @@
         #emoji-picker button:hover {
             background-color: #eee;
         }
-
+        .emoji-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            margin: 3px;
+            border-radius: 5px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .emoji-button:hover {
+            background-color: #f0f0f0;
+        }
         /* Bouton Envoyer */
         #chatbot-send {
             padding: 0; /* Padding géré par flex + taille */
@@ -455,15 +484,15 @@
     </style>
     </head>
     <body>
+        
         <div id="chatbot-toggle">
             <i class="fas fa-comments"></i> </div>
 
         <div id="chatbot-container">
             <div id="chatbot-header">
-                <img
-                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSpNxRRrQwVtcrotX_XcymUxR2b7oaFYcS6XKjJPG4FVeWlo5BGNsBcEA8NzHJdW3WeWvI&usqp=CAU"
-                    alt="Logo ENA">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSpNxRRrQwVtcrotX_XcymUxR2b7oaFYcS6XKjJPG4FVeWlo5BGNsBcEA8NzHJdW3WeWvI&usqp=CAU" alt="Logo ENA">
                 <span>ENA-RDC</span>
+                <span id="chatbot-status" class="status online">En ligne</span>
             </div>
 
             <div id="google-sign-in-container">
@@ -499,587 +528,706 @@
         </div>
 
         <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- Sélection des éléments du DOM ---
-            const chatbotToggle = document.getElementById('chatbot-toggle');
-            const chatbotContainer = document.getElementById('chatbot-container');
-            const googleSignInContainer = document.getElementById('google-sign-in-container');
-            const messageInput = document.getElementById('chatbot-input');
-            const sendButton = document.getElementById('chatbot-send');
-            const chatOutput = document.getElementById('chatbot-output');
-            const googleSignInButton = document.getElementById('google-sign-in');
-            const chatbotHeader = document.getElementById('chatbot-header');
-            const emojiButton = document.getElementById('emoji-button');
-            const emojiPicker = document.getElementById('emoji-picker');
-            const fileButton = document.getElementById('file-button');
-            const fileInput = document.getElementById('file-input');
-
-            // --- Variables d'état ---
-            let googleIdToken = null; // Sera initialisé depuis localStorage ou après connexion
-            // let isSignedIn = false; // Moins utile maintenant, on se base sur la présence de googleIdToken
-            const TOKEN_STORAGE_KEY = 'googleIdToken_enaChat'; // Clé spécifique localStorage
-            const GUEST_MESSAGES_COOKIE_NAME = 'enaChatHistory_guest'; // Nom du cookie pour non-connectés
-            const MESSAGES_STORAGE_KEY = 'chatMessages_enaChat'; // Clé spécifique localStorage pour connectés
-            let isDragging = false;
-            let offsetX, offsetY;
-            let initialLoadComplete = false; // Pour gérer le premier affichage du message de bienvenue
-            const MOBILE_BREAKPOINT = '(max-width: 600px)'; // Define mobile breakpoint
-
-            // --- Configuration ---
-            const GOOGLE_CLIENT_ID = '900358554333-g3k99qk3da90po7cc3ajm5cv8oq2dkda.apps.googleusercontent.com'; // ** METTEZ VOTRE VRAI ID CLIENT ICI **
-            const AUTH_BACKEND_URL = 'https://enabotserveur.onrender.com/api/auth/google'; // ** URL de votre backend pour l'auth Google **
-            const CHAT_BACKEND_URL = 'https://enabotserveur.onrender.com/api/chat'; // ** URL de votre backend pour les messages du chat **
-            const FILE_UPLOAD_BACKEND_URL = 'https://enabotserveur.onrender.com/api/upload'; // ** URL de votre backend pour l'upload de fichiers **
-
-            const EMOJI_LIST = [
-                '😊', '😂', '❤️', '👍', '🎉', '🤔', '😭', '🙏', '👏', '🔥',
-                '💯', '🎁', '🎈', '✅', '❌', '⚠️', '👋', '👌', '👀', '💡',
-                '❓', '❗', '➡️', '🚀', '✨', '📎', '📁', '⚙️', '💬', '🤖'
-                // Ajoutez plus d'emojis si nécessaire
-            ];
-
-            // --- Fonctions Cookies ---
-
-        function setCookie(name, value, days) {
-                let expires = "";
-                if (days) {
-                    const date = new Date();
-                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 10));
-                    expires = "; expires=" + date.toUTCString();
-                }
-                // Ajout SameSite=Lax pour la sécurité. Ajoutez "; Secure" si votre site est en HTTPS
-                 const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
-                document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax" + secureFlag;
-                // console.log("Cookie set:", name, "Expires:", expires || "Session");
-            }
-
-        function getCookie(name) {
-                const nameEQ = name + "=";
-                const ca = document.cookie.split(';');
-                for (let i = 0; i < ca.length; i++) {
-                    let c = ca[i];
-                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-                    if (c.indexOf(nameEQ) === 0) {
-                         // console.log("Cookie found:", name);
-                         return c.substring(nameEQ.length, c.length);
-                    }
-                }
-                 // console.log("Cookie not found:", name);
-                return null;
-            }
-
-        function deleteCookie(name) {
-                 console.log("Deleting cookie:", name);
-                // Met une date d'expiration passée
-                document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax';
-                 // Tenter aussi avec Secure si besoin
-                 const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
-                 document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax' + secureFlag;
-            }
-
-
-        // --- Fonctions Utilitaires ---
-
-        // Afficher un message utilisateur dans le chat
-        function displayUserMessage(message) {
-            const userDiv = document.createElement('div');
-            userDiv.classList.add('user-message', 'message-bubble');
-            userDiv.textContent = message; // Utiliser textContent pour éviter injection XSS simple
-            chatOutput.appendChild(userDiv);
-            scrollToBottom();
-        }
-
-        // Fonction pour formater l'heure
-        function formatTime(date) {
-            const hours = date.getHours().toString().padStart(2, '0');
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            return `${hours}:${minutes}`;
-        }        
-                
-        // Afficher un message utilisateur dans le chat
-        function displayUserMessage(message) {
-            const userDiv = document.createElement('div');
-            userDiv.classList.add('user-message', 'message-bubble');
-
-            const time = formatTime(new Date());
-            userDiv.innerHTML = `<span>${message}</span><span class="message-time">${time}</span>`;  // Ajout de l'heure
-
-            chatOutput.appendChild(userDiv);
-            scrollToBottom();
-        }
-
-        // Afficher un message bot dans le chat
-        function displayBotMessage(message) {
-            const botDiv = document.createElement('div');
-            botDiv.classList.add('bot-message', 'message-bubble');
-
-            const time = formatTime(new Date());
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            let lastIndex = 0;
-            let match;
-
-            while ((match = urlRegex.exec(message)) !== null) {
-                if (match.index > lastIndex) {
-                    botDiv.appendChild(document.createTextNode(message.substring(lastIndex, match.index)));
-                }
-                const link = document.createElement('a');
-                link.href = match[0];
-                link.textContent = match[0];
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                botDiv.appendChild(link);
-                lastIndex = match.index + match[0].length;
-            }
-
-            if (lastIndex < message.length) {
-                botDiv.appendChild(document.createTextNode(message.substring(lastIndex)));
-            }
-
-            botDiv.innerHTML += `<span class="message-time">${time}</span>`; // Ajout de l'heure
-            chatOutput.appendChild(botDiv);
-            scrollToBottom();
-        }
-
-                
-
-        // Faire défiler la fenêtre de chat vers le bas
-        function scrollToBottom() {
-             chatOutput.scrollTop = chatOutput.scrollHeight;
-        }
-
-        // Sauvegarder le token Google dans localStorage
-        function saveToken(token) {
-            try {
-                localStorage.setItem(TOKEN_STORAGE_KEY, token);
-                console.log("Token saved to localStorage.");
-            } catch (e) {
-                console.error("Erreur lors de la sauvegarde du token dans localStorage:", e);
-            }
-        }
-
-        // Récupérer le token Google depuis localStorage
-        function getToken() {
-            try {
-                const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-                // console.log("Token retrieved from localStorage:", token ? "Found" : "Not Found");
-                 return token;
-            } catch (e) {
-                console.error("Erreur lors de la récupération du token depuis localStorage:", e);
-                    return null;
-            }
-        }
-
-        // Effacer le token Google de localStorage
-        function clearToken() {
-            try {
-                localStorage.removeItem(TOKEN_STORAGE_KEY);
-                console.log("Token cleared from localStorage.");
-            } catch (e) {
-                console.error("Erreur lors de la suppression du token de localStorage:", e);
-            }
-        }
-
-        // Sauvegarder les messages (localStorage si connecté, cookie sinon)
-        function saveMessages(messages) {
-            const currentToken = getToken(); // Vérifier l'état d'authentification actuel
-            if (!Array.isArray(messages)) {
-                console.error("Tentative de sauvegarde de données non-tableau dans saveMessages:", messages);
-                return; // Ne pas sauvegarder de données invalides
-            }
-
-            if (currentToken) { // Utilisateur authentifié
-                try {
-                    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages));
-                    // Si on sauvegarde dans localStorage, on peut supposer que l'utilisateur est connecté
-                    // et on n'a plus besoin de l'historique guest.
-                    deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
-                    // console.log("Messages saved to localStorage.");
-                } catch (e) {
-                    console.error("Erreur lors de la sauvegarde des messages dans localStorage:", e);
-                }
-            } else { 
-                // Utilisateur non authentifié
-                try {
-                // Sauvegarde dans le cookie pour 7 jours
-                setCookie(GUEST_MESSAGES_COOKIE_NAME, JSON.stringify(messages), 7);
-                // console.log("Messages saved to cookie.");
-                } catch (e) {
-                    console.error("Erreur lors de la sauvegarde des messages dans le cookie:", e);
-                }
-            }
-        }
-
-        // Récupérer les messages (depuis localStorage si connecté, cookie sinon)
-        function getMessages() {
-            const currentToken = getToken();
-            let storedMessages = null;
-            let source = "None";
-
-            if (currentToken) { // Priorité à localStorage si connecté
-                try {
-                    storedMessages = localStorage.getItem(MESSAGES_STORAGE_KEY);
-                    source = "localStorage";
-                } catch (e) {
-                    console.error("Erreur lecture localStorage:", e);
-                }
-            } else { 
-                // Sinon, essayer le cookie
-                try {
-                    storedMessages = getCookie(GUEST_MESSAGES_COOKIE_NAME);
-                    source = "cookie";
-                } catch (e) {
-                    console.error("Erreur lecture cookie:", e);
-                }
-            }
-
-            if (storedMessages) {
-                try {
-                    const messages = JSON.parse(storedMessages);
-                    // Validation basique
-                    if (Array.isArray(messages)) {
-                    // console.log(`Messages loaded from ${source}. Count: ${messages.length}`);
-                    return messages;
-
-                    } else {
-                        console.warn(`Invalid non-array data found in ${source}, resetting.`);
-                        // Supprimer les données invalides
-                        if (source === 'localStorage') localStorage.removeItem(MESSAGES_STORAGE_KEY);
-                        if (source === 'cookie') deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
-                        return [];
-                    }
-                } catch (e) {
-                    console.error(`Erreur parsing messages from ${source}:`, e);
-                    // Supprimer les données invalides
-                    if (source === 'localStorage') localStorage.removeItem(MESSAGES_STORAGE_KEY);
-                    if (source === 'cookie') deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
-                    return [];
-                    // Retourne un tableau vide en cas d'erreur de parsing
-                }
-            }
-
-            // console.log("No valid stored messages found.");
-            return [];
-            // Retourne un tableau vide si rien n'est trouvé ou en cas d'erreur
-        }
-
-        // Charger et afficher les messages stockés
-        function loadStoredMessages() {
-            const storedMessages = getMessages(); 
-            // Utilise la nouvelle logique (cookie ou localStorage)
-            chatOutput.innerHTML = ''; 
-            // Nettoyer avant de charger
-            // Afficher le message de bienvenue seulement s'il n'y a AUCUN message stocké
-            // MODIFIED: Removed && !initialLoadComplete condition
-            if (storedMessages.length === 0) {
-                displayBotMessage('Bonjour ! Comment puis-je vous aider aujourd\'hui ?');
-                   // Ne pas sauvegarder ce message initial pour ne pas polluer l'historique vide
-            } else {
-
-                storedMessages.forEach(msg => {
-                    if (msg.type === 'user') {
-                        displayUserMessage(msg.content);
-                        }
-                    else if (msg.type === 'bot') {
-                        displayBotMessage(msg.content);
-                    }
-                });
-            }
-            initialLoadComplete = true; 
-            // Keep this flag for other potential uses (though less critical now)
-            scrollToBottom(); 
-            // Assurer le défilement après chargement
-        }
-        // --- Logique Google Sign-In ---
-
-        // Initialiser Google Sign In
-
-        function initializeGoogleSignIn() {
-            googleIdToken = getToken(); // Vérifier si un token existe déjà
-            if (googleIdToken) {
-                // Si un token existe, le valider et masquer le bouton Sign-In
-                console.log("Existing token found. Hiding Sign-In button.");
-                if (googleSignInContainer) googleSignInContainer.classList.remove('visible');
-                     handleExistingToken(); // Valider le token existant (pourrait être expiré)
-                } else {
-                    // Si pas de token, configurer et afficher le bouton Sign-In
-                    console.log("No existing token. Initializing Sign-In button.");
-                if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-                    google.accounts.id.initialize({
-                    client_id: GOOGLE_CLIENT_ID,
-                        callback: handleSignIn // Fonction appelée après connexion réussie
-                         });
-                         google.accounts.id.renderButton(
-                             googleSignInButton, // L'élément cible
-                             { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with" } // Options
-                         );
-                         if (googleSignInContainer) googleSignInContainer.classList.add('visible'); // Rendre visible
-                } else {
-                        console.error("La bibliothèque Google Sign-In n'est pas chargée.");
-                        displayBotMessage("Erreur: Impossible de charger la connexion Google.");
-                        if (googleSignInContainer) googleSignInContainer.classList.remove('visible'); // Masquer si erreur
-                }
-            }
-            // Charger les messages (depuis cookie ou localStorage) après l'initialisation de l'état de connexion
-            // Cela doit être fait APRES avoir déterminé si on affiche le bouton ou non
-            loadStoredMessages();
-        }
-
-        // Gérer un token déjà présent au chargement (vérifie l'expiration)
-        async function handleExistingToken() {
-            // googleIdToken est déjà chargé dans initializeGoogleSignIn
-            if (googleIdToken) {
-                try {
-                    const decodedToken = JSON.parse(atob(googleIdToken.split('.')[1]));
-                    const expirationTime = decodedToken.exp * 1000; // Convertir en millisecondes
-                    const currentTime = Date.now();
-                    if (currentTime >= expirationTime) {
-                        console.log("Token existant expiré.");
-                        clearToken();
-                        googleIdToken = null;
-                        // Réinitialiser pour afficher le bouton de connexion
-                        if (googleSignInContainer) googleSignInContainer.classList.add('visible');
-                            // Pas besoin de rappeler initializeGoogleSignIn ici,
-                            // car l'absence de token fera afficher le bouton au prochain rechargement.
-                            // S'assurer que l'état visuel est correct:
-                            google.accounts.id.renderButton( /* ... options ... */ ); // Rerendre le bouton
-                        } else {
-                            console.log("Token existant valide.");
-                            // L'utilisateur est considéré comme connecté
-                            if (googleSignInContainer) googleSignInContainer.classList.remove('visible');
-                        }
-                    } catch (e) {
-                        console.error("Erreur de décodage ou validation du token:", e);
-                        clearToken(); // Token invalide, le supprimer
-                        googleIdToken = null;
-                        if (googleSignInContainer) googleSignInContainer.classList.add('visible');
-                        google.accounts.id.renderButton( /* ... options ... */ ); // Rerendre le bouton
-                    }
-                }
-                 // On ne recharge pas les messages ici, c'est fait à la fin de initializeGoogleSignIn
-            }
-
-        // Callback après une connexion Google réussie
-        async function handleSignIn(response) {
-            if (response.credential) {
-                const previousToken = getToken(); // Garder une trace si l'utilisateur était déjà connecté
-                googleIdToken = response.credential; // Mettre à jour la variable globale
-                saveToken(googleIdToken); // Sauvegarder dans localStorage
-                console.log('Connexion Google réussie. Token ID obtenu.');
-                if (googleSignInContainer) googleSignInContainer.classList.remove('visible'); // Masquer le bouton
-                    // Effacer l'historique guest (cookie) car l'utilisateur se connecte.
-                    deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
-                    // Envoyer le token au backend pour validation/session
-                     try {
-                        const authResponse = await fetch(AUTH_BACKEND_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ token: googleIdToken })
-                        });
-
-                        if (authResponse.ok) {
-                            console.log('Authentification backend réussie.');
-
-                            // Vider l'historique local (localStorage) et visuel pour commencer une session propre.
-                            // C'est un choix de conception, on pourrait aussi essayer de récupérer
-                            // un historique serveur ici.
-                            saveMessages([]); // Vide localStorage
-                            chatOutput.innerHTML = ''; // Vider le chat visuellement
-
-                            // Afficher le message de bienvenue personnalisé
-                            try {
-                                const decodedToken = JSON.parse(atob(googleIdToken.split('.')[1]));
-                                const givenName = decodedToken.given_name || 'Utilisateur';
-                                const welcomeMsgContent = `Bonjour ${givenName}, bienvenue ! Comment puis-je aider ?`;
-                                displayBotMessage(welcomeMsgContent);
-                                saveMessages([{ type: 'bot', content: welcomeMsgContent }]); // Sauvegarde le 1er message connecté
-                            } catch (decodeError) {
-                                console.error("Erreur décodage token pour nom:", decodeError);
-                                const genericWelcome = `Bonjour, bienvenue ! Comment puis-je aider ?`;
-                                displayBotMessage(genericWelcome);
-                                saveMessages([{ type: 'bot', content: genericWelcome }]);
+                    document.addEventListener('DOMContentLoaded', () => {
+                        // --- Sélection des éléments du DOM ---
+                        const chatbotToggle = document.getElementById('chatbot-toggle');
+                        const chatbotContainer = document.getElementById('chatbot-container');
+                        const googleSignInContainer = document.getElementById('google-sign-in-container');
+                        const messageInput = document.getElementById('chatbot-input');
+                        const sendButton = document.getElementById('chatbot-send');
+                        const chatOutput = document.getElementById('chatbot-output');
+                        const googleSignInButton = document.getElementById('google-sign-in');
+                        const chatbotHeader = document.getElementById('chatbot-header'); // Utilisé pour le drag
+                        const emojiButton = document.getElementById('emoji-button');
+                        const emojiPicker = document.getElementById('emoji-picker');
+                        const fileButton = document.getElementById('file-button');
+                        const fileInput = document.getElementById('file-input');
+                        function updateStatus(isOnline) {
+                            const statusElement = document.getElementById('chatbot-status');
+                            if (statusElement) {
+                                if (isOnline) {
+                                    statusElement.textContent = 'En ligne';
+                                    statusElement.classList.remove('offline');
+                                    statusElement.classList.add('online');
+                                } else {
+                                    statusElement.textContent = 'Hors ligne';
+                                    statusElement.classList.remove('online');
+                                    statusElement.classList.add('offline');
+                                }
                             }
-
-                        } else {
-                            console.error('Échec de l\'authentification backend:', await authResponse.text());
-                            displayBotMessage('Erreur lors de la connexion au serveur.');
-                            clearToken(); // Échec, supprimer le token local
-                            googleIdToken = null;
-                            if (googleSignInContainer) googleSignInContainer.classList.add('visible'); // Réafficher bouton
-                            google.accounts.id.renderButton( /* ... options ... */ ); // Rerendre le bouton
                         }
-                    } catch (error) {
-                        console.error('Erreur réseau lors de l\'authentification backend:', error);
-                        displayBotMessage('Erreur réseau lors de la connexion.');
-                        clearToken();
-                        googleIdToken = null;
-                        if (googleSignInContainer) googleSignInContainer.classList.add('visible');
-                        google.accounts.id.renderButton( /* ... options ... */ ); // Rerendre le bouton
-                    }
-
-            } 
-            else {
-                    console.error('Échec de la connexion Google: Pas de credential.');
-                    displayBotMessage('Échec de la connexion Google.');
-            }
-        }
-        
-
-        // --- Logique d'Envoi de Message ---
-
-        async function sendMessage() {
-
-            const message = messageInput.value.trim();
-            if (!message) return; // Ne pas envoyer de message vide
-
-            const currentToken = getToken(); // Vérifier l'état d'authentification
-            const isUserAuthenticated = !!currentToken; // Boolean pour simplifier
-
-            displayUserMessage(message);
-            const currentUserMessage = { type: 'user', content: message };
-            // Sauvegarde toujours dans le bon stockage (cookie ou localStorage) via getMessages + saveMessages
-            saveMessages([...getMessages(), currentUserMessage]);
-
-            messageInput.value = '';
-            messageInput.focus();
-
-            // Préparer l'appel backend
-            sendButton.classList.add('sending');
-            sendButton.disabled = true;
-            // Construire les en-têtes : inclure Authorization seulement si authentifié
-            const headers = {
-            'Content-Type': 'application/json',
-            };
-            if (isUserAuthenticated) {
-                headers['Authorization'] = `Bearer ${currentToken}`;
-            } else {
-                console.log("Envoi en tant qu'invité (pas d'en-tête Authorization).");
-                // Assurez-vous que le backend gère cela !
-            }
-
-            try {
-                console.log(`Envoi au backend (${isUserAuthenticated ? 'Authentifié' : 'Invité'}):`, message);
-                const response = await fetch(CHAT_BACKEND_URL, {
-                    method: 'POST',
-                    headers: headers, // Utilise les en-têtes conditionnels
-                    body: JSON.stringify({ message: message })
-                });
-
-                sendButton.classList.remove('sending'); // Retirer l'état de chargement
-
-                if (response.ok) {
-                    const data = await response.json();
-                    // Adapter la ligne suivante selon la structure EXACTE de la réponse de votre backend
-                    const botResponseContent = data.message.message || data.response.message || data.reply || "Désolé, je n'ai pas compris.";
-                    const currentBotMessage = { type: 'bot', content: botResponseContent };
-                    displayBotMessage(botResponseContent);
-                    // Sauvegarde la réponse du bot dans le bon stockage (cookie ou localStorage)
-                    saveMessages([...getMessages(), currentBotMessage]);
-                    // Effet de validation
-                    sendButton.classList.add('sent');
-                    setTimeout(() => {
-                        sendButton.classList.remove('sent');
-                        sendButton.disabled = false;
-                    }, 1500);
-
-                } else {
-                    const errorData = await response.text(); // Obtenir plus de détails sur l'erreur
-                    console.error(`Erreur du serveur chatbot (${response.status}):`, errorData);
-                    const errorBotMessageContent = `Erreur ${response.status}: Impossible de joindre le chatbot.`;
-                    displayBotMessage(errorBotMessageContent);
-                    // Optionnel: sauvegarder aussi le message d'erreur localement
-                    // saveMessages([...getMessages(), { type: 'bot', content: errorBotMessageContent }]);
-                    sendButton.disabled = false; // Réactiver en cas d'erreur
-                }
-
-            } catch (error) {
-                console.error('Erreur réseau lors de l\'envoi du message:', error);
-                const networkErrorMsgContent = 'Erreur réseau. Veuillez vérifier votre connexion.';
-                displayBotMessage(networkErrorMsgContent);
-                // Optionnel: sauvegarder aussi le message d'erreur réseau
-                // saveMessages([...getMessages(), { type: 'bot', content: networkErrorMsgContent }]);
-                sendButton.classList.remove('sending');
-                sendButton.disabled = false; // Réactiver en cas d'erreur réseau
-            } finally {
-                // Double sécurité pour réactiver le bouton si qqchose se passe mal
-                if (!sendButton.classList.contains('sent')) {
-                    sendButton.disabled = false;
-                    sendButton.classList.remove('sending');
-                }
-             }
-        }
-
-
-        // --- Logique d'Ajout de Fichiers (Authentification requise pour cet exemple) ---
-        // MODIFICATION : L'upload de fichier reste conditionné à l'authentification pour cet exemple,
-        // car gérer l'upload de fichiers pour des invités anonymes pose des questions de sécurité/gestion.
-        // Si votre backend le permet, vous pourriez adapter comme pour sendMessage.
-
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            const currentToken = getToken(); // Vérifier si connecté
-
-            if (!file) return; // Pas de fichier
-
-            if (!currentToken) {
-                displayBotMessage("Veuillez vous connecter pour envoyer des fichiers.");
-                saveMessages([...getMessages(), { type: 'bot', content: "Veuillez vous connecter pour envoyer des fichiers." }]);
-                fileInput.value = ''; // Réinitialiser l'input
-                return; // Bloquer si non connecté
-            }
-
-            // --- Logique d'upload pour utilisateur connecté ---
-            console.log('Fichier sélectionné (connecté):', file.name, file.size, file.type);
-
-            displayUserMessage(`Fichier prêt à envoyer : ${file.name}`);
-            const uploadingMsgContent = `Envoi de ${file.name}...`;
-            displayBotMessage(uploadingMsgContent);
-            // Sauvegarder localement l'info + message d'envoi
-            saveMessages([...getMessages(), {type: 'user', content: `Fichier: ${file.name}`}, {type: 'bot', content: uploadingMsgContent}]);    
-            const formData = new FormData();
-            formData.append('file', file); // 'file' doit correspondre à ce que le backend attend
-
-            fetch(FILE_UPLOAD_BACKEND_URL, {
-                method: 'POST',
-                headers: {
-                    // Pas de 'Content-Type', FormData le gère
-                    'Authorization': `Bearer ${currentToken}` // Authentification requise
-                },
-                    body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json(); // ou .text() selon la réponse backend
-                } else {
-                    // Tenter de lire le message d'erreur
-                    return response.text().then(text => {
-                        throw new Error(`Échec de l'upload: ${response.status} - ${text}`);
-                    });
-                }
-            })
-            .then(data => {
-                console.log('Upload réussi:', data);
-                const successMsgContent = `Fichier ${file.name} envoyé avec succès.`;
-                displayBotMessage(successMsgContent);
-                saveMessages([...getMessages(), {type: 'bot', content: successMsgContent}]); // Ajouter le message de succès
-
-            // Le backend pourrait aussi envoyer une réponse de chat suite à l'upload
-                if (data && (data.chatResponse || data.message || data.reply)) {
-                    const backendResponseMsgContent = data.chatResponse || data.message || data.reply;
-                    displayBotMessage(backendResponseMsgContent);
-                    saveMessages([...getMessages(), { type: 'bot', content: backendResponseMsgContent }]);
-                }
-            })
-            .catch(error => {
-                console.error('Erreur d\'upload:', error);
-                const errorMsgContent = `Erreur lors de l'envoi de ${file.name}: ${error.message || 'Erreur inconnue'}`;
-                displayBotMessage(errorMsgContent);
-                saveMessages([...getMessages(), { type: 'bot', content: errorMsgContent }]);
-            })
-            .finally(() => {
-                fileInput.value = ''; // Réinitialiser l'input fichier
-            });
-        }
-
+                        
+                        // Exemple : Mettre à jour le statut en fonction de la connectivité
+                        window.addEventListener('online', () => updateStatus(true));
+                        window.addEventListener('offline', () => updateStatus(false));
+                        // --- Variables d'état ---
+                        let googleIdToken = null;
+                        const TOKEN_STORAGE_KEY = 'googleIdToken_enaChat';
+                        const GUEST_MESSAGES_COOKIE_NAME = 'enaChatHistory_guest';
+                        const MESSAGES_STORAGE_KEY = 'chatMessages_enaChat';
+                        let isDragging = false; // Pour la fonction de drag
+                        let offsetX, offsetY; // Pour la fonction de drag
+                        const MOBILE_BREAKPOINT = '(max-width: 600px)';
+            
+                        // --- Variables pour la gestion de la latence ---
+                        let waitingMessageTimeout = null;
+                        let waitingMessageElement = null;
+            
+                        // --- Configuration ---
+                        const GOOGLE_CLIENT_ID = '900358554333-g3k99qk3da90po7cc3ajm5cv8oq2dkda.apps.googleusercontent.com';
+                        const AUTH_BACKEND_URL = 'http://enabotserveur.onrender.com/api/auth/google';
+                        const CHAT_BACKEND_URL = 'http://enabotserveur.onrender.com/api/chat';
+                        const FILE_UPLOAD_BACKEND_URL = 'http://enabotserveur.onrender.com/api/upload';
+            
+                        // Liste d'emojis (gardée pour fonctionnalité)
+                        const EMOJI_LIST = [
+                            '😊', '😂', '❤️', '👍', '🎉', '🤔', '😭', '🙏', '👏', '🔥',
+                            '💯', '🎁', '🎈', '✅', '❌', '⚠️', '👋', '👌', '👀', '💡',
+                            '❓', '❗', '➡️', '🚀', '✨', '📎', '📁', '⚙️', '💬', '🤖'
+                        ];
+            
+                        // --- Fonctions Cookies (gardées car nécessaires pour l'historique guest) ---
+                        function setCookie(name, value, days) {
+                            let expires = "";
+                            if (days) {
+                                const date = new Date();
+                                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000)); // Correction ici: * 1000 pour les millisecondes
+                                expires = "; expires=" + date.toUTCString();
+                            }
+                             const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
+                            document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax" + secureFlag;
+                        }
+            
+                        function getCookie(name) {
+                            const nameEQ = name + "=";
+                            const ca = document.cookie.split(';');
+                            for (let i = 0; i < ca.length; i++) {
+                                let c = ca[i];
+                                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                                if (c.indexOf(nameEQ) === 0) {
+                                     return c.substring(nameEQ.length, c.length);
+                                }
+                            }
+                            return null;
+                        }
+            
+                        function deleteCookie(name) {
+                             const secureFlag = location.protocol === 'https:' ? '; Secure' : '';
+                            document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax' + secureFlag;
+                        }
+            
+                        // --- Fonctions Utilitaires ---
+            
+                        // Fonction pour formater l'heure (gardée)
+                        function formatTime(date) {
+                            const hours = date.getHours().toString().padStart(2, '0');
+                            const minutes = date.getMinutes().toString().padStart(2, '0');
+                            return `${hours}:${minutes}`;
+                        }
+            
+                        // Afficher un message utilisateur dans le chat (garder cette version avec l'heure)
+                        function displayUserMessage(message) {
+                            const userDiv = document.createElement('div');
+                            userDiv.classList.add('user-message', 'message-bubble');
+            
+                            const time = formatTime(new Date());
+                            // Utilisation sécurisée de innerHTML pour ajouter le span d'heure
+                            userDiv.innerHTML = `<span>${escapeHTML(message)}</span><span class="message-time">${time}</span>`; // Utiliser escapeHTML
+            
+                            chatOutput.appendChild(userDiv);
+                            scrollToBottom();
+                        }
+            
+                         // Fonction pour échapper les caractères HTML potentiels (sécurité)
+                        function escapeHTML(str) {
+                            const div = document.createElement('div');
+                            div.appendChild(document.createTextNode(str));
+                            return div.innerHTML;
+                        }
+            
+            
+                        // Afficher un message bot dans le chat (gardée, gère les liens et l'heure)
+                        function displayBotMessage(message) {
+                            const botDiv = document.createElement('div');
+                            botDiv.classList.add('bot-message', 'message-bubble');
+            
+                            const time = formatTime(new Date());
+                            const urlRegex = /(https?:\/\/[^\s]+)/g; // Regex pour détecter les URLs
+                            let lastIndex = 0;
+                            let match;
+            
+                            // Construire le contenu message par message pour gérer les liens
+                            while ((match = urlRegex.exec(message)) !== null) {
+                                // Ajouter le texte avant le lien (échappé)
+                                if (match.index > lastIndex) {
+                                    botDiv.appendChild(document.createTextNode(message.substring(lastIndex, match.index)));
+                                }
+                                // Ajouter le lien
+                                const link = document.createElement('a');
+                                link.href = match[0];
+                                link.textContent = match[0]; // Le texte affiché est l'URL elle-même
+                                link.target = '_blank'; // Ouvrir dans un nouvel onglet
+                                link.rel = 'noopener noreferrer'; // Sécurité pour les liens
+                                botDiv.appendChild(link);
+                                lastIndex = match.index + match[0].length;
+                            }
+            
+                            // Ajouter le texte restant après le dernier lien (échappé)
+                            if (lastIndex < message.length) {
+                                 botDiv.appendChild(document.createTextNode(message.substring(lastIndex)));
+                            }
+            
+                            // Ajouter l'heure (utilisation de innerHTML pour le span de l'heure, considéré sûr ici)
+                            botDiv.innerHTML += `<span class="message-time">${time}</span>`;
+            
+                            chatOutput.appendChild(botDiv);
+                            scrollToBottom();
+                             // Jouer le son de notification
+                            const messageSound = document.getElementById('message-sound');
+                            if (messageSound) {
+                                messageSound.play();
+                            }
+                        }
+            
+                        // Faire défiler la fenêtre de chat vers le bas (gardée)
+                        function scrollToBottom() {
+                             chatOutput.scrollTop = chatOutput.scrollHeight;
+                        }
+            
+                        // Sauvegarder le token Google dans localStorage (gardée)
+                        function saveToken(token) {
+                            try {
+                                localStorage.setItem(TOKEN_STORAGE_KEY, token);
+                                // console.log("Token saved to localStorage."); // Moins verbeux
+                            } catch (e) {
+                                console.error("Erreur lors de la sauvegarde du token dans localStorage:", e);
+                            }
+                        }
+            
+                        // Récupérer le token Google depuis localStorage (gardée)
+                        function getToken() {
+                            try {
+                                return localStorage.getItem(TOKEN_STORAGE_KEY);
+                            } catch (e) {
+                                console.error("Erreur lors de la récupération du token depuis localStorage:", e);
+                                return null;
+                            }
+                        }
+            
+                        // Effacer le token Google de localStorage (gardée)
+                        function clearToken() {
+                            try {
+                                localStorage.removeItem(TOKEN_STORAGE_KEY);
+                                // console.log("Token cleared from localStorage."); // Moins verbeux
+                            } catch (e) {
+                                console.error("Erreur lors de la suppression du token de localStorage:", e);
+                            }
+                        }
+            
+                        // Sauvegarder les messages (localStorage si connecté, cookie sinon - gardée)
+                        function saveMessages(messages) {
+                            const currentToken = getToken();
+                            if (!Array.isArray(messages)) {
+                                console.error("Tentative de sauvegarde de données non-tableau dans saveMessages:", messages);
+                                return;
+                            }
+            
+                            if (currentToken) {
+                                try {
+                                    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages));
+                                    // Si on sauvegarde dans localStorage, on n'a plus besoin de l'historique guest.
+                                    deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
+                                } catch (e) {
+                                    console.error("Erreur lors de la sauvegarde des messages dans localStorage:", e);
+                                }
+                            } else {
+                                try {
+                                    // Sauvegarde dans le cookie pour 7 jours
+                                    setCookie(GUEST_MESSAGES_COOKIE_NAME, JSON.stringify(messages), 7);
+                                } catch (e) {
+                                    console.error("Erreur lors de la sauvegarde des messages dans le cookie:", e);
+                                }
+                            }
+                        }
+            
+                        // Récupérer les messages (depuis localStorage si connecté, cookie sinon - gardée)
+                        function getMessages() {
+                            const currentToken = getToken();
+                            let storedMessages = null;
+                            let source = "None";
+            
+                            if (currentToken) {
+                                try {
+                                    storedMessages = localStorage.getItem(MESSAGES_STORAGE_KEY);
+                                    source = "localStorage";
+                                } catch (e) {
+                                    console.error("Erreur lecture localStorage:", e);
+                                }
+                            } else {
+                                try {
+                                    storedMessages = getCookie(GUEST_MESSAGES_COOKIE_NAME);
+                                    source = "cookie";
+                                } catch (e) {
+                                    console.error("Erreur lecture cookie:", e);
+                                }
+                            }
+            
+                            if (storedMessages) {
+                                try {
+                                    const messages = JSON.parse(storedMessages);
+                                    if (Array.isArray(messages)) {
+                                       return messages;
+                                    } else {
+                                        console.warn(`Invalid non-array data found in ${source}, resetting.`);
+                                        if (source === 'localStorage') localStorage.removeItem(MESSAGES_STORAGE_KEY);
+                                        if (source === 'cookie') deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
+                                        return [];
+                                    }
+                                } catch (e) {
+                                    console.error(`Erreur parsing messages from ${source}:`, e);
+                                    if (source === 'localStorage') localStorage.removeItem(MESSAGES_STORAGE_KEY);
+                                    if (source === 'cookie') deleteCookie(GUEST_MESSAGES_COOKIE_NAME);
+                                    return [];
+                                }
+                            }
+            
+                            return [];
+                        }
+            
+                        // Charger et afficher les messages stockés (simplifié)
+                        function loadStoredMessages() {
+                            const storedMessages = getMessages();
+                            chatOutput.innerHTML = ''; // Nettoyer avant de charger
+            
+                            if (storedMessages.length === 0) {
+                                // Afficher le message de bienvenue si AUCUN message stocké
+                                displayBotMessage('Bonjour ! Comment puis-je vous aider aujourd\'hui ?');
+                                // On ne sauvegarde PAS ce message initial dans l'historique vide
+                            } else {
+                                storedMessages.forEach(msg => {
+                                    if (msg.type === 'user') {
+                                        displayUserMessage(msg.content); // Utiliser msg.content
+                                    } else if (msg.type === 'bot') {
+                                        displayBotMessage(msg.content); // Utiliser msg.content
+                                    }
+                                });
+                            }
+                            scrollToBottom();
+                        }
+            
+                        // --- Logique Google Sign-In (gardée) ---
+                        function initializeGoogleSignIn() {
+                            googleIdToken = getToken();
+                            if (googleIdToken) {
+                                if (googleSignInContainer) googleSignInContainer.classList.remove('visible');
+                                handleExistingToken(); // Valider le token existant
+                            } else {
+                                if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                                    google.accounts.id.initialize({
+                                        client_id: GOOGLE_CLIENT_ID,
+                                        callback: handleSignIn
+                                    });
+                                    google.accounts.id.renderButton(
+                                        googleSignInButton,
+                                        { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with" }
+                                    );
+                                    if (googleSignInContainer) googleSignInContainer.classList.add('visible');
+                                } else {
+                                    console.error("La bibliothèque Google Sign-In n'est pas chargée.");
+                                     // Pas de message bot affiché ici pour éviter la duplication si loadStoredMessages affiche le sien
+                                     if (googleSignInContainer) googleSignInContainer.classList.remove('visible');
+                                }
+                            }
+                            // Charger les messages (cookie ou localStorage) APRES avoir initialisé l'état d'auth
+                             loadStoredMessages(); // Moved here
+                        }
+            
+                        async function handleExistingToken() {
+                             if (googleIdToken) {
+                                try {
+                                    // Validation basique côté client (ne remplace pas la validation backend)
+                                    const decodedToken = JSON.parse(atob(googleIdToken.split('.')[1]));
+                                    const expirationTime = decodedToken.exp * 1000;
+                                    const currentTime = Date.now();
+                                    if (currentTime >= expirationTime) {
+                                        console.log("Token existant expiré.");
+                                        clearToken();
+                                        googleIdToken = null;
+                                        if (googleSignInContainer) googleSignInContainer.classList.add('visible');
+                                         if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                                            // Rerendre le bouton si la lib est chargée
+                                            google.accounts.id.renderButton( googleSignInButton, { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with" } );
+                                        }
+                                    } else {
+                                        console.log("Token existant valide.");
+                                        if (googleSignInContainer) googleSignInContainer.classList.remove('visible');
+                                    }
+                                } catch (e) {
+                                    console.error("Erreur de décodage ou validation du token:", e);
+                                    clearToken();
+                                    googleIdToken = null;
+                                    if (googleSignInContainer) googleSignInContainer.classList.add('visible');
+                                     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                                         google.accounts.id.renderButton( googleSignInButton, { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with" } );
+                                     }
+                                }
+                            }
+                        }
+            
+                        async function handleSignIn(response) {
+                            if (response.credential) {
+                                googleIdToken = response.credential;
+                                saveToken(googleIdToken);
+                                console.log('Connexion Google réussie. Token ID obtenu.');
+                                if (googleSignInContainer) googleSignInContainer.classList.remove('visible');
+            
+                                deleteCookie(GUEST_MESSAGES_COOKIE_NAME); // Effacer l'historique guest
+            
+                                 try {
+                                    const authResponse = await fetch(AUTH_BACKEND_URL, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ token: googleIdToken })
+                                    });
+            
+                                    if (authResponse.ok) {
+                                        console.log('Authentification backend réussie.');
+            
+                                        // Vider l'historique local et visuel et charger un nouveau message de bienvenue
+                                        saveMessages([]); // Vide localStorage
+                                        chatOutput.innerHTML = '';
+            
+                                        try {
+                                            const decodedToken = JSON.parse(atob(googleIdToken.split('.')[1]));
+                                            const givenName = decodedToken.given_name || 'Utilisateur';
+                                            const welcomeMsgContent = `Bonjour ${givenName}, bienvenue ! Comment puis-je aider ?`;
+                                            displayBotMessage(welcomeMsgContent);
+                                            saveMessages([{ type: 'bot', content: welcomeMsgContent }]); // Sauvegarde le 1er message connecté
+                                        } catch (decodeError) {
+                                            console.error("Erreur décodage token pour nom:", decodeError);
+                                            const genericWelcome = `Bonjour, bienvenue ! Comment puis-je aider ?`;
+                                            displayBotMessage(genericWelcome);
+                                            saveMessages([{ type: 'bot', content: genericWelcome }]);
+                                        }
+            
+                                    } else {
+                                        console.error('Échec de l\'authentification backend:', await authResponse.text());
+                                        displayBotMessage('Erreur lors de la connexion au serveur.');
+                                        clearToken();
+                                        googleIdToken = null;
+                                        if (googleSignInContainer) googleSignInContainer.classList.add('visible');
+                                         if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                                             google.accounts.id.renderButton( googleSignInButton, { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with" } );
+                                         }
+                                    }
+                                } catch (error) {
+                                    console.error('Erreur réseau lors de l\'authentification backend:', error);
+                                    displayBotMessage('Erreur réseau lors de la connexion.');
+                                    clearToken();
+                                    googleIdToken = null;
+                                    if (googleSignInContainer) googleSignInContainer.classList.add('visible');
+                                     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                                         google.accounts.id.renderButton( googleSignInButton, { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "signin_with" } );
+                                     }
+                                }
+                            }
+                            else {
+                                console.error('Échec de la connexion Google: Pas de credential.');
+                                displayBotMessage('Échec de la connexion Google.');
+                            }
+                        }
+            
+                        // --- Logique d'Envoi de Message (Intégration du message d'attente) ---
+                        async function sendMessage() {
+                            const message = messageInput.value.trim();
+                            if (!message) return; // Ne pas envoyer de message vide
+            
+                            const currentToken = getToken();
+                            const isUserAuthenticated = !!currentToken;
+            
+                            // 1. Afficher le message utilisateur et le sauvegarder
+                            displayUserMessage(message);
+                            const currentUserMessage = { type: 'user', content: message };
+                            // Récupérer l'historique actuel, ajouter le message utilisateur, et sauvegarder
+                            saveMessages([...getMessages(), currentUserMessage]);
+            
+                            // Nettoyer l'input et désactiver le bouton
+                            messageInput.value = '';
+                            messageInput.focus();
+                            sendButton.classList.add('sending');
+                            sendButton.disabled = true;
+            
+                            // --- Gestion de la latence : Afficher un message d'attente après un délai ---
+                            // Annule tout timer précédent et retire l'ancien message d'attente si existants
+                            if (waitingMessageTimeout) {
+                                clearTimeout(waitingMessageTimeout);
+                                waitingMessageTimeout = null;
+                            }
+                             if (waitingMessageElement && waitingMessageElement.parentNode) {
+                                 waitingMessageElement.parentNode.removeChild(waitingMessageElement);
+                                 waitingMessageElement = null;
+                             }
+            
+                            waitingMessageTimeout = setTimeout(() => {
+                                // Ce code s'exécute si la réponse prend plus de 5 secondes
+                                waitingMessageElement = document.createElement('div');
+                                // Ajouter une classe spécifique pour le style du message d'attente
+                                waitingMessageElement.classList.add('bot-message', 'message-bubble', 'waiting-message');
+                                waitingMessageElement.textContent = 'Veuillez patienter...';
+                                chatOutput.appendChild(waitingMessageElement);
+                                scrollToBottom();
+                                console.log("Affichage du message d'attente après 5s.");
+                            }, 5000); // 5000 millisecondes = 5 secondes
+            
+            
+                            // 2. Préparer et envoyer l'appel backend
+                            const headers = {
+                                'Content-Type': 'application/json',
+                            };
+                            if (isUserAuthenticated) {
+                                headers['Authorization'] = `Bearer ${currentToken}`;
+                            }
+            
+                            try {
+                                console.log(`Envoi au backend (${isUserAuthenticated ? 'Authentifié' : 'Invité'}):`, message);
+                                const response = await fetch(CHAT_BACKEND_URL, {
+                                    method: 'POST',
+                                    headers: headers,
+                                    body: JSON.stringify({ message: message })
+                                });
+            
+                                // --- Nettoyer le message d'attente et le timer dès que la réponse arrive (succès ou échec HTTP) ---
+                                clearTimeout(waitingMessageTimeout);
+                                waitingMessageTimeout = null;
+                                if (waitingMessageElement && waitingMessageElement.parentNode) {
+                                    waitingMessageElement.parentNode.removeChild(waitingMessageElement);
+                                    waitingMessageElement = null;
+                                    console.log("Message d'attente retiré (réponse du fetch reçue).");
+                                }
+            
+                                if (response.ok) {
+                                    const data = await response.json();
+                                    // Adapter l'accès à la réponse selon la structure exacte de votre backend
+                                    const botResponseContent = data.message?.message || data.response?.message || data.reply || "Désolé, je n'ai pas compris la réponse du bot.";
+                                    const currentBotMessage = { type: 'bot', content: botResponseContent };
+            
+                                    // 3. Afficher et sauvegarder la réponse du bot
+                                    displayBotMessage(botResponseContent);
+                                    saveMessages([...getMessages(), currentBotMessage]); // Ajouter et sauvegarder
+            
+                                    // Effet visuel de succès et réactivation du bouton
+                                    sendButton.classList.add('sent');
+                                    setTimeout(() => {
+                                        sendButton.classList.remove('sent');
+                                        sendButton.disabled = false;
+                                    }, 1500);
+            
+                                } else {
+                                     // Gérer les erreurs HTTP (ex: 400, 500)
+                                    const errorData = await response.text();
+                                    console.error(`Erreur du serveur chatbot (${response.status}):`, errorData);
+                                    const errorBotMessageContent = `Erreur ${response.status}: Impossible de joindre le chatbot ou réponse invalide.`;
+                                    displayBotMessage(errorBotMessageContent);
+                                    // saveMessages([...getMessages(), { type: 'bot', content: errorBotMessageContent }]); // Optionnel: sauvegarder l'erreur
+                                    sendButton.disabled = false; // Réactiver le bouton
+                                }
+            
+                            } catch (error) {
+                                 // Gérer les erreurs réseau (pas de connexion, timeout fetch si configuré, etc.)
+                                console.error('Erreur réseau lors de l\'envoi du message:', error);
+                                const networkErrorMsgContent = 'Erreur réseau. Veuillez vérifier votre connexion.';
+                                displayBotMessage(networkErrorMsgContent);
+                                // saveMessages([...getMessages(), { type: 'bot', content: networkErrorMsgContent }]); // Optionnel: sauvegarder l'erreur
+            
+                                // --- Nettoyer le message d'attente et le timer en cas d'erreur réseau ---
+                                clearTimeout(waitingMessageTimeout);
+                                waitingMessageTimeout = null;
+                                 if (waitingMessageElement && waitingMessageElement.parentNode) {
+                                     waitingMessageElement.parentNode.removeChild(waitingMessageElement);
+                                     waitingMessageElement = null;
+                                     console.log("Message d'attente retiré (erreur réseau catch).");
+                                 }
+            
+                                sendButton.disabled = false; // Réactiver le bouton
+                            } finally {
+                                // Ce bloc s'exécute toujours après try/catch.
+                                // Le nettoyage du timer/message est déjà fait dans try/catch.
+                                // Ce finally assure que la classe 'sending' est retirée.
+                                sendButton.classList.remove('sending');
+                                // Le bouton est déjà disabled=false en cas de succès ou erreur.
+                            }
+                        }
+            
+                        // --- Logique d'Ajout de Fichiers (gardée, nécessite authentification dans cet ex.) ---
+                        function handleFileSelect(event) {
+                            const file = event.target.files[0];
+                            const currentToken = getToken();
+            
+                            if (!file) return;
+            
+                            if (!currentToken) {
+                                const msg = "Veuillez vous connecter pour envoyer des fichiers.";
+                                displayBotMessage(msg);
+                                saveMessages([...getMessages(), { type: 'bot', content: msg }]);
+                                fileInput.value = '';
+                                return;
+                            }
+            
+                            console.log('Fichier sélectionné (connecté):', file.name, file.size, file.type);
+            
+                             // Afficher le message utilisateur pour l'envoi du fichier
+                            displayUserMessage(`Fichier: ${file.name}`);
+                            const userFileMsg = { type: 'user', content: `Fichier: ${file.name}` };
+                            saveMessages([...getMessages(), userFileMsg]); // Sauvegarde immédiate du message fichier utilisateur
+            
+                            const uploadingMsgContent = `Envoi de ${file.name}...`;
+                            displayBotMessage(uploadingMsgContent);
+                            const botUploadingMsg = {type: 'bot', content: uploadingMsgContent};
+            
+            
+                            const formData = new FormData();
+                            formData.append('file', file);
+            
+                            fetch(FILE_UPLOAD_BACKEND_URL, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${currentToken}`
+                                },
+                                body: formData
+                            })
+                            .then(response => {
+                                // IMPORTANT: Ajoutez le message d'attente pour l'upload si nécessaire,
+                                // comme fait dans sendMessage. Ce code actuel ne gère pas le timeout pour l'upload.
+                                // Il faudrait ajouter un timer ici aussi si l'upload/traitement backend est long.
+            
+                                if (response.ok) {
+                                    return response.json();
+                                } else {
+                                    return response.text().then(text => {
+                                        throw new Error(`Échec de l'upload: ${response.status} - ${text}`);
+                                    });
+                                }
+                            })
+                            .then(data => {
+                                console.log('Upload réussi:', data);
+                                const successMsgContent = `Fichier ${file.name} envoyé avec succès.`;
+                                displayBotMessage(successMsgContent);
+                                const botSuccessMsg = { type: 'bot', content: successMsgContent };
+                                // Sauvegarde l'historique complet après le message bot de succès
+                                saveMessages([...getMessages(), botUploadingMsg, botSuccessMsg]);
+            
+            
+                                // Gérer la réponse de chat éventuelle du backend
+                                if (data && (data.chatResponse || data.message || data.reply)) {
+                                     const backendResponseMsgContent = data.chatResponse || data.message || data.reply;
+                                     displayBotMessage(backendResponseMsgContent);
+                                     saveMessages([...getMessages(), botUploadingMsg, botSuccessMsg, { type: 'bot', content: backendResponseMsgContent }]); // Sauvegarde avec la réponse chat
+                                } else {
+                                     // Si pas de réponse chat supplémentaire, sauvegarder l'historique avec juste le message de succès
+                                    saveMessages([...getMessages(), botUploadingMsg, botSuccessMsg]);
+                                }
+            
+            
+                            })
+                            .catch(error => {
+                                console.error('Erreur d\'upload:', error);
+                                const errorMsgContent = `Erreur lors de l'envoi de ${file.name}: ${error.message || 'Erreur inconnue'}`;
+                                displayBotMessage(errorMsgContent);
+                                const botErrorMsg = { type: 'bot', content: errorMsgContent };
+                                 // Sauvegarde l'historique complet après le message bot d'erreur
+                                saveMessages([...getMessages(), botUploadingMsg, botErrorMsg]);
+                            })
+                            .finally(() => {
+                                fileInput.value = ''; // Réinitialiser l'input fichier
+                            });
+                        }
+            
+                        // --- Logique Drag & Drop du Chatbot (gardée) ---
+                        chatbotHeader.addEventListener('mousedown', (e) => {
+                            // ... (your existing drag logic) ...
+                             if (window.matchMedia(MOBILE_BREAKPOINT).matches) return; // Désactiver le drag sur mobile
+            
+                             isDragging = true;
+                             // Calculer l'offset par rapport à la position de la souris dans l'élément
+                             offsetX = e.clientX - chatbotContainer.getBoundingClientRect().left;
+                             offsetY = e.clientY - chatbotContainer.getBoundingClientRect().top;
+            
+                             // Empêcher la sélection de texte pendant le drag
+                             chatbotContainer.style.userSelect = 'none';
+                             chatbotContainer.style.cursor = 'grabbing';
+                        });
+            
+                         document.addEventListener('mousemove', (e) => {
+                             if (!isDragging) return;
+            
+                             // Calculer les nouvelles positions
+                             const newLeft = e.clientX - offsetX;
+                             const newTop = e.clientY - offsetY;
+            
+                             // Appliquer les positions
+                             chatbotContainer.style.left = `${newLeft}px`;
+                             chatbotContainer.style.top = `${newTop}px`;
+                         });
+            
+                         document.addEventListener('mouseup', () => {
+                             if (!isDragging) return;
+            
+                             isDragging = false;
+                             // Réactiver la sélection de texte et le curseur par défaut
+                             chatbotContainer.style.userSelect = '';
+                             chatbotContainer.style.cursor = '';
+            
+                             // Optionnel : sauvegarder la position dans localStorage
+                             // localStorage.setItem('chatbotPosition', JSON.stringify({ left: chatbotContainer.style.left, top: chatbotContainer.style.top }));
+                         });
+            
+                        // Appliquer la position sauvegardée au chargement (optionnel)
+                        // const savedPosition = localStorage.getItem('chatbotPosition');
+                        // if (savedPosition) {
+                        //     try {
+                        //         const pos = JSON.parse(savedPosition);
+                        //         chatbotContainer.style.left = pos.left;
+                        //         chatbotContainer.style.top = pos.top;
+                        //         chatbotContainer.style.position = 'fixed'; // S'assurer qu'il est positionné fixement
+                        //     } catch(e) { console.error("Erreur lecture position sauvegardée:", e); }
+                        // } else {
+                             // Position par défaut si aucune sauvegarde
+                             chatbotContainer.style.position = 'fixed';
+                             // Vous pouvez définir une position de départ par défaut ici si besoin
+                             // chatbotContainer.style.right = '20px';
+                             // chatbotContainer.style.bottom = '20px';
+                        // }
+            
+            
+                        // --- Logique Emoji Picker (gardée) ---
+                        emojiButton.addEventListener('click', (e) => {
+                            e.stopPropagation(); // Empêche la propagation au document click pour la fermeture
+                             emojiPicker.classList.toggle('open');
+                             if (emojiPicker.classList.contains('open')) {
+                                 // Générer les emojis si le picker s'ouvre
+                                 if (emojiPicker.innerHTML === '') { // Générer une seule fois
+                                     EMOJI_LIST.forEach(emoji => {
+                                         const span = document.createElement('span');
+                                         span.textContent = emoji;
+                                         span.classList.add('emoji-item');
+                                         span.addEventListener('click', () => {
+                                             messageInput.value += emoji;
+                                             messageInput.focus(); // Remettre le focus sur l'input
+                                             emojiPicker.classList.remove('open'); // Fermer après sélection
+                                         });
+                                         emojiPicker.appendChild(span);
+                                     });
+                                 }
+                             }
+                        });
+            
+                        // Fermer l'emoji picker si on clique en dehors
+                        document.addEventListener('click', (e) => {
+                             if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== emojiButton) {
+                                 emojiPicker.classList.remove('open');
+                             }
+                        });
+            
         // --- Gestionnaire d'Événements ---
         // --- NOUVELLE Fonction pour gérer l'ouverture/fermeture ---
         let chatStateRestored = false; // Flag pour le chargement initial
@@ -1194,6 +1342,7 @@
                 EMOJI_LIST.forEach(emoji => {
                     const button = document.createElement('button');
                     button.textContent = emoji;
+                    button.classList.add('emoji-button');
                     button.addEventListener('click', () => {
                         messageInput.value += emoji;
                         emojiPicker.classList.remove('open');
