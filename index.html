@@ -3,17 +3,146 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Chatbot Flottant ENA (Amélioré avec Cookies & Backend pour
-            tous)</title>
-        <script src="https://accounts.google.com/gsi/client" async
-            defer></script>
-
-        <link rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-            integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
-            crossorigin="anonymous" referrerpolicy="no-referrer" />
-
+        <title>École Nationale d'Administration - RDC</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
         <style>
+        body {
+            margin: 0;
+            font-family: 'Roboto', Arial, sans-serif;
+            background: #f4f7fa;
+            color: #222;
+        }
+        header {
+            background: #003366;
+            color: #fff;
+            padding: 0.5rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .header-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1rem;
+        }
+        .header-logo {
+            display: flex;
+            align-items: center;
+        }
+        .header-logo img {
+            height: 48px;
+            width: 48px;
+            border-radius: 8px;
+            margin-right: 1rem;
+        }
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        nav {
+            display: flex;
+            gap: 1.5rem;
+        }
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav a:hover {
+            color: #ffcc00;
+        }
+        .hero {
+            background: linear-gradient(120deg, #eaf1fa 60%, #cce0f6 100%);
+            padding: 3rem 1rem 2rem 1rem;
+            text-align: center;
+        }
+        .hero h1 {
+            font-size: 2.2rem;
+            color: #003366;
+            margin-bottom: 1rem;
+        }
+        .hero p {
+            font-size: 1.15rem;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto 1.5rem auto;
+        }
+        .hero img {
+            max-width: 220px;
+            margin-top: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+        }
+        main {
+            max-width: 1100px;
+            margin: 2rem auto 0 auto;
+            padding: 0 1rem;
+        }
+        .info-section {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            padding: 2rem 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .info-section h2 {
+            color: #003366;
+            margin-top: 0;
+        }
+        .info-section ul {
+            padding-left: 1.2rem;
+        }
+        .info-section li {
+            margin-bottom: 0.5rem;
+        }
+        footer {
+            background: #003366;
+            color: #fff;
+            text-align: center;
+            padding: 1rem 0;
+            margin-top: 2rem;
+            font-size: 0.95rem;
+        }
+        /* Chatbot container always on top */
+        #chatbot-container {
+            z-index: 1000;
+        }
+        /* Responsive */
+        @media (max-width: 900px) {
+            .header-content, main {
+                max-width: 98vw;
+            }
+            .hero h1 {
+                font-size: 1.5rem;
+            }
+        }
+        @media (max-width: 600px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .header-logo img {
+                height: 38px;
+                width: 38px;
+            }
+            .header-title {
+                font-size: 1.1rem;
+            }
+            .hero {
+                padding: 2rem 0.5rem 1.5rem 0.5rem;
+            }
+            .hero img {
+                max-width: 120px;
+            }
+            .info-section {
+                padding: 1rem 0.5rem;
+            }
+        }
         /* Styles généraux */
         :root {
             --primary-color: #090D81;
@@ -474,6 +603,49 @@
     </style>
     </head>
     <body>
+        <header>
+        <div class="header-content">
+            <div class="header-logo">
+                <img src="./logo.jpg" alt="Logo ENA RDC">
+                <span class="header-title">École Nationale d'Administration<br><span style="font-size:0.95em;font-weight:400;">RDC / Kinshasa</span></span>
+            </div>
+            <nav>
+                <a href="#">Accueil</a>
+                <a href="#presentation">Présentation</a>
+                <a href="#formations">Formations</a>
+                <a href="#contact">Contact</a>
+            </nav>
+        </div>
+    </header>
+    <section class="hero">
+        <h1>Bienvenue à l'École Nationale d'Administration de la RDC</h1>
+        <p>L'ENA-RDC forme les cadres de demain pour une administration publique moderne, efficace et intègre. Découvrez nos programmes, nos valeurs et notre engagement pour le développement de la République Démocratique du Congo.</p>
+        <img src="./logo.jpg" alt="Logo ENA RDC">
+    </section>
+    <main>
+        <section class="info-section" id="presentation">
+            <h2>Présentation</h2>
+            <p>L'École Nationale d'Administration (ENA) de la RDC, située à Kinshasa, est une institution publique dédiée à la formation, au perfectionnement et à la promotion des agents et cadres de l'État. Elle vise à renforcer la gouvernance et la performance de l'administration publique congolaise.</p>
+        </section>
+        <section class="info-section" id="formations">
+            <h2>Formations</h2>
+            <ul>
+                <li>Formation initiale des futurs cadres de l'État</li>
+                <li>Formations continues et spécialisées</li>
+                <li>Ateliers et séminaires de renforcement des capacités</li>
+            </ul>
+        </section>
+        <section class="info-section" id="contact">
+            <h2>Contact</h2>
+            <p>Email : <a href="mailto:contact@ena-rdc.cd">contact@ena-rdc.cd</a><br>
+            Adresse : 123, Avenue de l'ENA, Kinshasa, RDC<br>
+            Téléphone : +243 999 000 000</p>
+        </section>
+    </main>
+    <footer>
+        &copy; 2025 École Nationale d'Administration - RDC. Tous droits réservés.
+    </footer>
+
         <audio id="message-sound" src="notifiation.mp3" preload="auto"></audio>
 
         <div id="chatbot-toggle">
